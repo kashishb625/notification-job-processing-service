@@ -6,10 +6,11 @@ import org.springframework.stereotype.Service;
 
 import com.Kashish.notification_job_service.dto.NotificationJobRequest;
 import com.Kashish.notification_job_service.entity.NotificationJob;
+import com.Kashish.notification_job_service.exception.ResourceNotFoundException;
 import com.Kashish.notification_job_service.repository.NotificationJobRepository;
 
 @Service
-class NotificationJobService 
+public class NotificationJobService 
 {
 	private final NotificationJobRepository notificationJobRepository;
 
@@ -32,7 +33,7 @@ class NotificationJobService
 
 	public NotificationJob getJobById(Long id)
 	{
-		return notificationJobRepository.findById(id).orElseThrow(null);
+		return notificationJobRepository.findById(id).orElseThrow(()->new ResourceNotFoundException("Notification job not found with id: "+id));
 	}
 	
 	public List<NotificationJob> getAllJobs()

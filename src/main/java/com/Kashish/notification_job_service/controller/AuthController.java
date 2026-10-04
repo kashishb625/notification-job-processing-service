@@ -1,5 +1,7 @@
 package com.Kashish.notification_job_service.controller;
 
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,16 +40,22 @@ public class AuthController
     }
 	
 	@PostMapping("/login")
-	public ResponseEntity<String> login(@RequestBody LoginRequest request)
+	public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request)
 	{
-		User user=userService.findByUsername(request.getUsername());
-		
-		if(user==null || !passwordEncoder.matches(request.getPassword(), user.getPassword()))
-		{
-			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid username or password");
-		}
-		String token=jwtService.generateToken(user);
-		return ResponseEntity.ok(token);
+	    User user = userService.findByUsername(request.getUsername());
+
+	    if(user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword()))
+	    {
+	        return ResponseEntity
+	                .status(HttpStatus.UNAUTHORIZED)
+	                .body(Map.of("message", "Invalid username or password"));
+	    }
+
+	    String token = jwtService.generateToken(user);
+
+	    return ResponseEntity.ok(
+	            Map.of("token", token)
+	    );
 	}
 	
 	

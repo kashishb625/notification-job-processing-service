@@ -13,10 +13,12 @@ import com.Kashish.notification_job_service.repository.NotificationJobRepository
 public class NotificationJobService 
 {
 	private final NotificationJobRepository notificationJobRepository;
+	private final NotificationJobProducer notificationJobProducer;
 
-	public NotificationJobService(NotificationJobRepository notificationJobRepository) 
+	public NotificationJobService(NotificationJobRepository notificationJobRepository, NotificationJobProducer notificationJobProducer) 
 	{
 		this.notificationJobRepository = notificationJobRepository;
+		this.notificationJobProducer=notificationJobProducer;
 	}
 	
 	public NotificationJob createJob(NotificationJobRequest request)
@@ -28,7 +30,10 @@ public class NotificationJobService
 		job.setStatus("PENDING");
 		job.setRetryCount(0);
 		
-		return notificationJobRepository.save(job);
+		NotificationJob savedJob= notificationJobRepository.save(job);
+		notificationJobProducer.sendJob(savedJob);
+
+		return savedJob;
 	}
 
 	public NotificationJob getJobById(Long id)

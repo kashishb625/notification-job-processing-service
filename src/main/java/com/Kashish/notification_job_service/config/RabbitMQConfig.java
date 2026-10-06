@@ -1,11 +1,13 @@
 package com.Kashish.notification_job_service.config;
 
 import org.springframework.amqp.core.Binding;
+
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 
 @Configuration
 public class RabbitMQConfig
@@ -35,5 +37,11 @@ public class RabbitMQConfig
                 .bind(notificationQueue)
                 .to(notificationExchange)
                 .with(ROUTING_KEY);
+    }
+    
+    @Bean
+    public JacksonJsonMessageConverter messageConverter()
+    {
+        return new JacksonJsonMessageConverter();
     }
 }

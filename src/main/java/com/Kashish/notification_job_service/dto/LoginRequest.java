@@ -1,9 +1,12 @@
 package com.Kashish.notification_job_service.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class LoginRequest 
 {
-	
+	@NotBlank(message="Username cannot be empty")
 	private String username;
+	@NotBlank(message="Password is required")
 	private String password;
 	
 	public String getUsername() 

@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
 
 
 @Entity
@@ -16,7 +17,9 @@ public class User
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
 	@Column(unique=true, nullable=false)
+	@NotBlank(message="Username cannot be empty")
 	private String username;
+	@NotBlank(message="Password is required")
 	@Column(nullable = false)
 	private String password;
 	@Column(nullable = false)

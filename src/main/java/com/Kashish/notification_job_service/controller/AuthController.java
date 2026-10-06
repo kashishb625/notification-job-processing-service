@@ -15,6 +15,8 @@ import com.Kashish.notification_job_service.entity.User;
 import com.Kashish.notification_job_service.service.JwtService;
 import com.Kashish.notification_job_service.service.UserService;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController
@@ -31,7 +33,8 @@ public class AuthController
 	}
 	
 	@PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user)
+    public ResponseEntity<User> register(@Valid
+    		@RequestBody User user)
     {
         return new ResponseEntity<>(
                 userService.createUser(user),
@@ -40,7 +43,7 @@ public class AuthController
     }
 	
 	@PostMapping("/login")
-	public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request)
+	public ResponseEntity<Map<String, String>> login(@Valid @RequestBody LoginRequest request)
 	{
 	    User user = userService.findByUsername(request.getUsername());
 

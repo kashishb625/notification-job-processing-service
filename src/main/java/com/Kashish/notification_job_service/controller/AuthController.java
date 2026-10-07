@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.Kashish.notification_job_service.dto.LoginRequest;
+import com.Kashish.notification_job_service.dto.UserResponse;
 import com.Kashish.notification_job_service.entity.User;
 import com.Kashish.notification_job_service.service.AuditLogService;
 import com.Kashish.notification_job_service.service.JwtService;
@@ -37,13 +38,18 @@ public class AuthController
 	}
 	
 	@PostMapping("/register")
-    public ResponseEntity<User> register(@Valid
+    public ResponseEntity<UserResponse> register(@Valid
     		@RequestBody User user)
     {
        User savedUser= userService.createUser(user);
        auditLogService.logEvent(null, savedUser.getUsername(), "USER_REGISTERED");
-        
-       return new ResponseEntity<>(savedUser,HttpStatus.CREATED);
+       
+       UserResponse response=new UserResponse();
+       response.setId(savedUser.getId());
+       response.setUsername(savedUser.getUsername());
+       response.setRole(savedUser.getRole());
+       
+       return new ResponseEntity<>(response,HttpStatus.CREATED);
     }
 	
 	@PostMapping("/login")
@@ -51,12 +57,37 @@ public class AuthController
 	{
 	    User user = userService.findByUsername(request.getUsername());
 
-	    if(user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword()))
+	    if(user == null)
 	    {
-	    	auditLogService.logEvent(null, user.getUsername(), "USER_LOGIN_FAILED");
+	        auditLogService.logEvent(
+	                null,
+	                request.getUsername(),
+	                "USER_LOGIN_FAILED"
+	        );
+
 	        return ResponseEntity
 	                .status(HttpStatus.UNAUTHORIZED)
-	                .body(Map.of("message", "Invalid username or password"));
+	                .body(Map.of(
+	                        "message",
+	                        "Invalid username or password"
+	                ));
+	    }
+	    if(!passwordEncoder.matches(
+	            request.getPassword(),
+	            user.getPassword()))
+	    {
+	        auditLogService.logEvent(
+	                null,
+	                request.getUsername(),
+	                "USER_LOGIN_FAILED"
+	        );
+
+	        return ResponseEntity
+	                .status(HttpStatus.UNAUTHORIZED)
+	                .body(Map.of(
+	                        "message",
+	                        "Invalid username or password"
+	                ));
 	    }
 
 	    String token = jwtService.generateToken(user);

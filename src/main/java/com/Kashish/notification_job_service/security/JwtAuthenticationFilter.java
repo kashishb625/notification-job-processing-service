@@ -56,6 +56,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter
                 SecurityContextHolder.getContext()
                         .setAuthentication(authentication);
             }
+            else
+            {
+            	response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+
+                response.getWriter().write(
+                        "{\"status\":401,\"message\":\"Invalid or expired authentication token.\"}"
+                );
+
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);

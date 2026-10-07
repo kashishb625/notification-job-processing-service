@@ -14,10 +14,13 @@ public class SecurityConfig
 {
 	
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+	private final CustomAccessDeniedHandler customAccessDeniedHandler;
 
-	public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter)
+	public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+			CustomAccessDeniedHandler customAccessDeniedHandler)
 	{
 	    this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+	    this.customAccessDeniedHandler=customAccessDeniedHandler;
 	}
 	
 	@Bean
@@ -35,11 +38,13 @@ public class SecurityConfig
 				requestMatchers("/api/auth/**").permitAll()
 				.requestMatchers("/api/users/**").hasRole("ADMIN")
 				.anyRequest().authenticated())
+		.exceptionHandling(exception ->
+	    exception.accessDeniedHandler(customAccessDeniedHandler))
 		.sessionManagement(session ->
         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 		.addFilterBefore(
         jwtAuthenticationFilter,
-        UsernamePasswordAuthenticationFilter.class);;
+        UsernamePasswordAuthenticationFilter.class);
 		
 		return http.build();
 	}

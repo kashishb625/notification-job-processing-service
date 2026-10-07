@@ -15,11 +15,14 @@ public class NotificationJobWorker
 	
 	private final NotificationJobRepository notificationJobRepository;
 	private final NotificationJobProducer notificationJobProducer;
+	private final AuditLogService auditLogService;
 	
-    public NotificationJobWorker(NotificationJobRepository notificationJobRepository, NotificationJobProducer notificationJobProducer) 
+    public NotificationJobWorker(NotificationJobRepository notificationJobRepository, NotificationJobProducer notificationJobProducer
+    		,AuditLogService auditLogService) 
     {
 		this.notificationJobRepository = notificationJobRepository;
 		this.notificationJobProducer=notificationJobProducer;
+		this.auditLogService=auditLogService;
 	}
 
 
@@ -29,6 +32,10 @@ public class NotificationJobWorker
 		Long jobId=((Number) message.get("id")).longValue();
 		
 		NotificationJob job=notificationJobRepository.findById(jobId).orElseThrow(()->new RuntimeException("Notification job not found with id: "+jobId));
+		
+		job.setStatus("PROCESSING...");
+		notificationJobRepository.save(job); 
+		auditLogService.logEvent(job.getId(),null, "JOB_PROCESSING");
 		
 		int maxRetries=3;
 		
@@ -47,6 +54,7 @@ public class NotificationJobWorker
         
         job.setStatus("COMPLETED");
         notificationJobRepository.save(job); 
+        auditLogService.logEvent(job.getId(),null, "JOB_COMPLETED");
         
         System.out.println("Job Status: COMPLETED");
         System.out.println("=================================");
@@ -63,7 +71,8 @@ public class NotificationJobWorker
 				
 				System.out.println("Job Permanently failed after "+retryCount+" attempts");
 				
-				 notificationJobRepository.save(job);
+			    notificationJobRepository.save(job);
+			    auditLogService.logEvent(job.getId(),null, "JOB_FAILED");
 			}
 			
 			else
@@ -71,6 +80,7 @@ public class NotificationJobWorker
 				job.setStatus("RETRYING");
 				
 				notificationJobRepository.save(job);
+				auditLogService.logEvent(job.getId(),null, "JOB_RETRYING");
 				 
 				System.out.println("Notification processing failed. "+"Retry attempt: "+retryCount);
 				

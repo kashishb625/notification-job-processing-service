@@ -2,6 +2,9 @@ package com.Kashish.notification_job_service.service;
 
 import java.util.List;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.stereotype.Service;
 
 import com.Kashish.notification_job_service.dto.NotificationJobRequest;
@@ -14,11 +17,14 @@ public class NotificationJobService
 {
 	private final NotificationJobRepository notificationJobRepository;
 	private final NotificationJobProducer notificationJobProducer;
+	private final AuditLogService auditLogService;
 
-	public NotificationJobService(NotificationJobRepository notificationJobRepository, NotificationJobProducer notificationJobProducer) 
+	public NotificationJobService(NotificationJobRepository notificationJobRepository, 
+			NotificationJobProducer notificationJobProducer, AuditLogService auditLogService) 
 	{
 		this.notificationJobRepository = notificationJobRepository;
 		this.notificationJobProducer=notificationJobProducer;
+		this.auditLogService=auditLogService;
 	}
 	
 	public NotificationJob createJob(NotificationJobRequest request)
@@ -30,7 +36,15 @@ public class NotificationJobService
 		job.setStatus("PENDING");
 		job.setRetryCount(0);
 		
+		
+		Authentication authentication= SecurityContextHolder.getContext().getAuthentication();
+		
+		String username=authentication.getName();
+		
 		NotificationJob savedJob= notificationJobRepository.save(job);
+		
+		auditLogService.logEvent(savedJob.getId(), username, "JOB_CREATED");
+		
 		notificationJobProducer.sendJob(savedJob);
 
 		return savedJob;

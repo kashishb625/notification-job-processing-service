@@ -35,7 +35,7 @@ public class GlobalExceptionHandler
 	{
 		Map<String,Object> response=new HashMap<>();
 		
-		response.put("status", 400);
+		response.put("status", 404);
 		response.put("message", ex.getMessage());
 		
 		return new ResponseEntity<>(response,HttpStatus.NOT_FOUND);

@@ -1,6 +1,6 @@
 # Notification & Job Processing Service
 
-A secure backend service for accepting, queueing, processing, and monitoring notification jobs with authentication, authorization, retry handling, and job status tracking.
+A secure Java Spring Boot backend service for accepting, queueing, processing, and monitoring notification jobs using REST APIs, JWT authentication, RabbitMQ, retry handling, job status tracking, metrics, and audit logging.
 
 ---
 
@@ -8,213 +8,290 @@ A secure backend service for accepting, queueing, processing, and monitoring not
 
 The **Notification & Job Processing Service** is a backend application designed to process notification jobs asynchronously.
 
-Instead of processing every notification request directly inside the API request, the service stores the job, places it into a message queue, and allows a background worker to process it independently.
+Instead of processing every notification request directly within the API request, the service stores the job in the database, publishes it to a RabbitMQ queue, and allows a background worker to process it independently.
 
-The system demonstrates real-world backend concepts such as:
+The project demonstrates practical backend engineering concepts including:
 
 - RESTful API development
 - JWT-based authentication
 - Role-based authorization
+- Secure password handling using BCrypt
 - Asynchronous job processing
-- Message queuing
+- RabbitMQ message queuing
 - Retry and failure handling
 - Job status tracking
-- Validation and exception handling
-- Logging and audit events
-- Automated testing
+- Request validation
+- Global exception handling
+- Structured HTTP error responses
+- Audit logging
+- Processing metrics
+- Automated unit testing
+- Integration testing
 - Database persistence
 
 ---
 
 ## 🎯 Problem Statement
 
-Synchronous notification processing can make API requests slow and can make failure handling difficult.
+Synchronous notification processing can make API requests slower and can make failure handling difficult.
 
-This project addresses the problem by separating **job creation** from **job processing**.
+This project addresses this problem by separating **job creation** from **job processing**.
 
-A client creates a notification job through the REST API. The job is stored in the database and sent to a message queue. A background worker consumes the queued job and processes it independently.
+A client creates a notification job through the REST API. The job is stored in MySQL and published to RabbitMQ. A background worker consumes the queued job and processes it independently.
 
-Failed jobs can be retried automatically, and jobs that exceed the maximum retry limit are marked as permanently failed.
+If processing fails, the job can be retried. After reaching the maximum retry limit, the job is marked as failed.
+
+This architecture demonstrates a basic asynchronous job-processing workflow suitable for backend systems that need reliable background processing.
 
 ---
 
 ## 🏗️ Architecture
 
-```text
-                    ┌─────────────────┐
-                    │     Client      │
-                    │    / Postman    │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │    REST API     │
-                    │   Spring Boot   │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │   Job Service   │
-                    └──────┬─────┬────┘
-                           │     │
-                    Save   │     │ Send
-                           ▼     ▼
-                    ┌────────┐ ┌───────────┐
-                    │  MySQL │ │ RabbitMQ  │
-                    └────────┘ └─────┬─────┘
-                                     │
-                                     ▼
-                              ┌─────────────┐
-                              │   Worker    │
-                              └──────┬──────┘
-                                     │
-                              ┌──────┴──────┐
-                              │             │
-                           Success       Failure
-                              │             │
-                              ▼             ▼
-                         COMPLETED       RETRY
-                                            │
-                                    Retry limit reached?
-                                      │            │
-                                     No           Yes
-                                      │            │
-                                      ▼            ▼
-                                   PROCESS   PERMANENTLY_FAILED
-```
+    Client / Postman
+           |
+           v
+      REST API
+     Spring Boot
+           |
+           v
+      Job Service
+        /     \
+       /       \
+      v         v
+    MySQL    RabbitMQ
+                |
+                v
+             Worker
+                |
+          +-----+-----+
+          |           |
+       Success     Failure
+          |           |
+          v           v
+      COMPLETED    RETRYING
+                      |
+              Retry limit reached
+                      |
+                      v
+                    FAILED
 
 ---
 
 ## 🔄 Job Processing Flow
 
-```text
-CREATE JOB
-    ↓
-PENDING
-    ↓
-QUEUED
-    ↓
-PROCESSING
-   ↙     ↘
-SUCCESS  FAILURE
-           ↓
-         RETRY
-           ↓
-     Retry limit reached?
-       ↙           ↘
-     NO             YES
-      ↓              ↓
-   PROCESS       PERMANENTLY_FAILED
-```
-
+                          CREATE JOB
+                             |
+                             v
+                          PENDING
+                             |
+                             v
+                      RabbitMQ Queue
+                             |
+                             v
+                        PROCESSING
+                       /          \
+                      /            \
+                 SUCCESS          FAILURE
+                    |                |
+                    v                v
+                COMPLETED         RETRYING
+                                      |
+                                      v
+                            Retry Limit Reached?
+                              /              \
+                             /                \
+                           NO                  YES
+                           |                    |
+                           v                    v
+                         RETRY                FAILED
 ---
 
 ## ✨ Core Features
 
 ### 1. User Authentication
 
+The application provides secure user authentication using JWT.
+
+Implemented features:
+
 - User registration
 - Secure password hashing using BCrypt
 - User login
 - JWT token generation
 - JWT token validation
+- Invalid token handling
+- Authentication audit events
 
 ### 2. Role-Based Authorization
 
-The system will support two roles:
+The application supports two roles:
 
 - `USER`
 - `ADMIN`
 
-Users will have access to their permitted operations, while administrators will have access to administrative operations.
+Administrative endpoints are protected using Spring Security role-based authorization.
+
+Implemented authorization behavior includes:
+
+- Protected API endpoints
+- ADMIN-only user management endpoints
+- USER/ADMIN access control
+- Meaningful `403 Forbidden` responses
+- Stateless authentication using JWT
 
 ### 3. Notification Job Management
 
-The API will allow clients to:
+The service provides REST APIs for notification job management.
+
+Implemented operations:
 
 - Create notification jobs
-- View job details
-- View job status
-- Track processing results
-- Handle failed jobs
+- Retrieve a specific job
+- Retrieve all jobs
+- Track job processing status
+- Track retry count
+- Handle missing job resources
+
+Each job contains:
+
+- Job ID
+- Recipient
+- Message
+- Status
+- Retry count
 
 ### 4. Message Queue
 
-**RabbitMQ** will be used to decouple job creation from job processing.
+**RabbitMQ** is used to decouple job creation from job processing.
 
-```text
-REST API → Database → RabbitMQ → Worker → Processing
-```
+Basic workflow:
+
+    REST API → MySQL → RabbitMQ → Background Worker → Notification Processing
+
+RabbitMQ provides asynchronous communication between the API layer and the background worker.
 
 ### 5. Background Processing
 
-A background worker will consume notification jobs from the queue and process them asynchronously.
+A RabbitMQ listener consumes notification jobs from the configured queue.
 
-### 6. Retry Mechanism
+The worker:
 
-When a job fails:
+1. Receives the queued job.
+2. Retrieves the corresponding job from the database.
+3. Updates the job status to `PROCESSING...`.
+4. Processes the notification.
+5. Updates the final status.
+6. Records the corresponding audit event.
 
-```text
-Processing Failure
-       ↓
-    Retry Job
-       ↓
-Retry Limit Reached?
-   ↓            ↓
- No            Yes
- ↓              ↓
-Retry        Permanent Failure
-```
+### 6. Retry and Failure Handling
 
-The maximum retry count will be configurable.
+The worker implements retry handling for failed processing attempts.
+
+The current maximum retry limit is **3 attempts**.
+
+Processing flow:
+
+                       Processing Failure
+                           |
+                           v
+                  Increment Retry Count
+                           |
+                           v
+                  Retry Limit Reached?
+                     /           \
+                    /             \
+                  No               Yes
+                  |                 |
+                  v                 v
+              RETRYING           FAILED
+                  |
+                  v
+              Requeue Job
+
+The retry mechanism and failure behavior are covered by automated worker tests.
 
 ### 7. Job Status Tracking
 
-Jobs will maintain their processing state.
+Jobs maintain their processing state throughout their lifecycle.
 
-Planned statuses include:
+Implemented statuses include:
 
 - `PENDING`
-- `QUEUED`
-- `PROCESSING`
+- `PROCESSING...`
 - `COMPLETED`
 - `RETRYING`
 - `FAILED`
-- `PERMANENTLY_FAILED`
 
-### 8. Validation & Error Handling
+The status and retry count are persisted in the database.
 
-The API will include:
+### 8. Validation and Error Handling
 
-- Request validation
+The API implements request validation and centralized exception handling.
+
+Implemented features include:
+
+- Request body validation using Jakarta Bean Validation
+- Required field validation
 - Meaningful validation messages
-- Structured error responses
 - Global exception handling
+- Resource-not-found handling
 - Appropriate HTTP status codes
+- Structured authentication and authorization error responses
 
-### 9. Logging & Audit Events
+Validated HTTP responses include:
 
-Important job lifecycle events will be recorded, such as:
+- `400 Bad Request`
+- `401 Unauthorized`
+- `403 Forbidden`
+- `404 Not Found`
 
+### 9. Logging and Audit Events
+
+Important application and job lifecycle events are recorded through an audit logging mechanism.
+
+Implemented audit events include:
+
+- `USER_REGISTERED`
+- `USER_LOGIN_SUCCESS`
+- `USER_LOGIN_FAILED`
 - `JOB_CREATED`
-- `JOB_QUEUED`
 - `JOB_PROCESSING`
-- `JOB_SUCCESS`
+- `JOB_COMPLETED`
+- `JOB_RETRYING`
 - `JOB_FAILED`
-- `JOB_RETRY`
-- `JOB_PERMANENTLY_FAILED`
 
-### 10. Metrics
+Audit records include:
 
-The service will expose basic processing metrics such as:
+- Event
+- Job ID where applicable
+- Username where applicable
+- Timestamp
+
+### 10. Processing Metrics
+
+The service exposes basic job-processing metrics through a REST endpoint.
+
+Available metrics include:
 
 - Total jobs
-- Pending jobs
-- Processing jobs
-- Successful jobs
+- Completed jobs
 - Failed jobs
-- Permanently failed jobs
-- Retry count
+- Retrying jobs
+
+Endpoint:
+
+`GET /api/metrics/jobs`
+
+Example response:
+
+    {
+      "totalJobs": 13,
+      "completedJobs": 4,
+      "failedJobs": 2,
+      "retryingJobs": 1
+    }
+
+The remaining jobs may have other statuses such as `PENDING` or `PROCESSING...`.
 
 ---
 
@@ -224,52 +301,64 @@ The service will expose basic processing metrics such as:
 |---|---|
 | Java | Backend programming language |
 | Spring Boot | Backend framework |
-| Spring Security | Authentication & authorization |
+| Spring Security | Authentication and authorization |
 | JWT | Stateless authentication |
+| BCrypt | Password hashing |
 | Spring Data JPA | Database persistence |
 | Hibernate | ORM |
 | MySQL | Relational database |
 | RabbitMQ | Message queue |
-| Maven | Build & dependency management |
-| Postman | API testing |
+| Maven | Build and dependency management |
+| Postman | API and integration testing |
 | JUnit | Automated testing |
-| Docker | Containerization |
+| Mockito | Unit testing and mocking |
+| Docker | Containerized infrastructure |
 
 ---
 
 ## 🗄️ Database
 
-The project currently uses **MySQL** for persistence.
+The application currently uses **MySQL** for persistent data storage.
 
-The main data expected to be stored includes:
+The database stores information related to:
 
 - Users
-- Notification Jobs
-- Job processing information
+- Notification jobs
 - Retry information
-- Audit information
+- Audit events
 
-> **Note:** PostgreSQL is recommended in the original project specification, but MySQL is being used as a documented alternative for this implementation.
+### Database Configuration
+
+Sensitive configuration such as database passwords and JWT secrets should be supplied through environment/configuration mechanisms rather than committed directly to source control.
+
+> **Note:** PostgreSQL was specified as the preferred database in the original project requirements. MySQL is used in this implementation as a documented alternative.
 
 ---
 
 ## 🔐 Security
 
-The application will use:
+Security is implemented using **Spring Security and JWT**.
+
+Security features include:
 
 - BCrypt password hashing
-- JWT authentication
+- JWT-based authentication
+- Stateless session management
 - Role-based authorization
-- Protected API endpoints
-- Environment variables for sensitive configuration
+- Protected REST endpoints
+- ADMIN-only user management
+- Invalid token handling
+- Custom `401 Unauthorized` responses
+- Custom `403 Forbidden` responses
+- Sensitive configuration protection
 
 Sensitive information such as:
 
 - Database passwords
 - JWT secrets
-- Other credentials
+- Credentials
 
-will not be committed to the repository.
+should not be committed to the repository.
 
 ---
 
@@ -277,79 +366,153 @@ will not be committed to the repository.
 
 ### Authentication
 
-```text
-POST /api/auth/register
-POST /api/auth/login
-```
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+
+### User Management
+
+- `GET /api/users`
+- `GET /api/users/{id}`
+
+> User management endpoints are restricted to `ADMIN` users.
 
 ### Notification Jobs
 
-```text
-POST /api/jobs
-GET  /api/jobs/{id}
-GET  /api/jobs
-```
+- `POST /api/jobs`
+- `GET /api/jobs`
+- `GET /api/jobs/{id}`
 
-Additional endpoints may be added as the project develops.
+### Metrics
+
+- `GET /api/metrics/jobs`
 
 ---
 
-## 🧪 Testing Strategy
+## 📋 Example Job Request
 
-The project will include automated and API-level testing for:
+    {
+      "recipient": "user@example.com",
+      "message": "Your notification message"
+    }
 
-### Authentication
+### Example Job Response
 
-- Successful registration
-- Successful login
-- Invalid credentials
-- Invalid JWT
-- Expired JWT
+    {
+      "id": 13,
+      "recipient": "user@example.com",
+      "message": "Your notification message",
+      "status": "COMPLETED",
+      "retryCount": 0
+    }
 
-### Job Processing
+---
+
+## 🧪 Testing and Validation
+
+The project includes both **automated testing** and **API-level integration testing**.
+
+### Automated Tests
+
+The automated test suite covers:
+
+- User service behavior
+- Password encoding
+- User lookup
+- Notification job creation
+- Job retrieval
+- Missing job handling
+- Successful job processing
+- Retry behavior
+- Maximum retry/failure handling
+
+Current automated test result:
+
+    Tests Run: 8
+    Failures: 0
+    Errors: 0
+
+### Integration Testing
+
+The API was validated using Postman and the running Spring Boot application.
+
+Integration testing covered:
 
 - Job creation
-- Successful processing
-- Failed processing
-- Retry behavior
-- Maximum retry handling
-- Permanent failure
+- Successful job completion
+- Request validation
+- Invalid JWT handling
+- Unauthorized role access
+- Missing job handling
+- Job metrics
+- RabbitMQ queue activity
 
-### Authorization
+### HTTP Response Validation
 
-- USER access
-- ADMIN access
-- Unauthorized requests
-- Forbidden requests
+| Scenario | Expected Response |
+|---|---|
+| Valid job creation | `201 Created` |
+| Successful job retrieval | `200 OK` |
+| Invalid request data | `400 Bad Request` |
+| Invalid authentication token | `401 Unauthorized` |
+| Unauthorized role | `403 Forbidden` |
+| Job not found | `404 Not Found` |
+
+### Testing Evidence
+
+Testing evidence is maintained in:
+
+    Testing Evidence/
+    ├── Automated Tests/
+    │   └── 01_All_Automated_Tests_Passed.png
+    │
+    └── Integration Tests/
+        ├── 01_Job_Created.png
+        ├── 02_Job_Completed.png
+        ├── 03_Invalid_Recipient_Validation.png
+        ├── 04_Invalid_Message_Validation.png
+        ├── 05_Both_Fields_Invalid_Validation.png
+        ├── 06_Job_Metrics_Verification.png
+        ├── 07_Unauthorized_Role_403.png
+        ├── 08_RabbitMQ_Queue_Activity.png
+        ├── 09_Invalid_JWT_401.png
+        └── 10_Job_Not_Found_404.png
 
 ---
 
 ## 📁 Project Structure
 
-```text
-src/
-├── main/
-│   ├── java/
-│   │   └── com/Kashish/notification_job_service/
-│   │       ├── controller/
-│   │       ├── dto/
-│   │       ├── entity/
-│   │       ├── repository/
-│   │       ├── security/
-│   │       └── service/
-│   │
-│   └── resources/
-│       └── application.properties
-│
-└── test/
-    └── java/
-```
-
-The package structure may evolve as additional components such as messaging, workers, retry handling, metrics, and audit logging are implemented.
+    notification-job-processing-service/
+    │
+    ├── src/
+    │   ├── main/
+    │   │   ├── java/
+    │   │   │   └── com/Kashish/notification_job_service/
+    │   │   │       ├── config/
+    │   │   │       ├── controller/
+    │   │   │       ├── dto/
+    │   │   │       ├── entity/
+    │   │   │       ├── exception/
+    │   │   │       ├── repository/
+    │   │   │       ├── security/
+    │   │   │       └── service/
+    │   │   │
+    │   │   └── resources/
+    │   │       └── application.properties
+    │   │
+    │   └── test/
+    │       └── java/
+    │
+    ├── Testing Evidence/
+    │   ├── Automated Tests/
+    │   └── Integration Tests/
+    │
+    ├── pom.xml
+    ├── README.md
+    └── .gitignore
 
 ---
 
-## 🗺️ Development Roadmap
+## 🔄 Development Milestones
 
 ### Project Foundation
 
@@ -358,78 +521,194 @@ The package structure may evolve as additional components such as messaging, wor
 - [x] User entity and repository
 - [x] Password encryption
 - [x] User registration
-- [x] Basic login
-- [x] JWT foundation
+- [x] User login
+- [x] JWT authentication
 
 ### Security
 
-- [ ] JWT authentication filter
-- [ ] Role-based authorization
-- [ ] USER/ADMIN access control
+- [x] JWT authentication filter
+- [x] Role-based authorization
+- [x] USER/ADMIN access control
+- [x] Protected endpoints
+- [x] Invalid token handling
+- [x] Security error handling
 
 ### Job Management
 
-- [ ] Notification Job entity
-- [ ] Job DTOs
-- [ ] Job repository
-- [ ] Job service
-- [ ] Job REST APIs
-- [ ] Request validation
-- [ ] Global exception handling
+- [x] Notification Job entity
+- [x] Job DTO
+- [x] Job repository
+- [x] Job service
+- [x] Job REST APIs
+- [x] Request validation
+- [x] Global exception handling
+- [x] Resource-not-found handling
 
 ### Asynchronous Processing
 
-- [ ] RabbitMQ integration
-- [ ] Job producer
-- [ ] Background worker
-- [ ] Notification processing
+- [x] RabbitMQ configuration
+- [x] Job producer
+- [x] Background worker
+- [x] Notification processing
 
 ### Reliability
 
-- [ ] Retry mechanism
-- [ ] Failure handling
-- [ ] Maximum retry handling
-- [ ] Permanent failure handling
+- [x] Retry mechanism
+- [x] Failure handling
+- [x] Maximum retry handling
+- [x] Failed job status tracking
 
 ### Monitoring
 
-- [ ] Job status tracking
-- [ ] Metrics
-- [ ] Audit logging
-- [ ] Processing logs
+- [x] Job status tracking
+- [x] Processing metrics
+- [x] Audit logging
+- [x] Processing logs
 
-### Testing & Deployment
+### Testing
 
-- [ ] Automated tests
-- [ ] Integration testing
-- [ ] Bug fixing
-- [ ] Docker setup
-- [ ] Final documentation
+- [x] Automated unit tests
+- [x] Worker retry tests
+- [x] Failure handling tests
+- [x] API validation testing
+- [x] Authentication testing
+- [x] Authorization testing
+- [x] Integration testing
+- [x] RabbitMQ validation
+- [x] Metrics validation
+
+### Finalization
+
+- [ ] Docker deployment setup
+- [ ] Requirements and evidence documentation
 - [ ] Final QA
-- [ ] Demo preparation
+- [ ] Final GitHub verification
+- [ ] Final project submission
 
 ---
 
-## 🚀 Future Improvements
+## 📊 Requirements Coverage
+
+The implementation addresses the major project requirements:
+
+| Requirement | Implementation |
+|---|---|
+| RESTful endpoints | Spring Boot REST Controllers |
+| Authentication | JWT + Spring Security |
+| Authorization | USER/ADMIN RBAC |
+| Input validation | Jakarta Bean Validation |
+| Structured errors | Global exception handling |
+| Job queue | RabbitMQ |
+| Background processing | RabbitMQ Worker |
+| Retry handling | Worker retry mechanism |
+| Database persistence | MySQL + JPA/Hibernate |
+| Job tracking | NotificationJob status |
+| Metrics | `/api/metrics/jobs` |
+| Audit logging | AuditLog entity/service |
+| Automated tests | JUnit + Mockito |
+| Integration validation | Postman |
+| Version control | Git + GitHub |
+| Infrastructure | Docker/RabbitMQ container |
+
+---
+
+## 🚀 Running the Project
+
+### Prerequisites
+
+Make sure the following are installed:
+
+- Java
+- Maven
+- MySQL
+- Docker
+- RabbitMQ
+- Postman
+
+### Start RabbitMQ
+
+RabbitMQ can be run using Docker.
+
+    docker start notification-rabbitmq
+
+RabbitMQ Management UI:
+
+`http://localhost:15672`
+
+### Start the Application
+
+Run the Spring Boot application from Eclipse or using Maven:
+
+    mvn spring-boot:run
+
+The application will start on the configured server port.
+
+### API Testing
+
+Postman can be used to test the REST endpoints.
+
+Authentication flow:
+
+    Register User
+          ↓
+        Login
+          ↓
+      Receive JWT
+          ↓
+    Use JWT in Authorization Header
+          ↓
+    Access Protected APIs
+
+---
+
+## ⚠️ Scope and Limitations
+
+This project focuses on demonstrating a reliable backend workflow for notification job processing.
+
+Current limitations include:
+
+- Notification delivery is simulated rather than connected to an external email/SMS provider.
+- RabbitMQ is currently used as a single queue-based processing mechanism.
+- Metrics are basic database-backed counters rather than a full monitoring platform.
+- Retry processing uses a fixed maximum retry limit.
+- The application does not currently implement a dedicated dead-letter queue.
+- Docker deployment configuration is part of the final project deployment setup.
+
+These limitations keep the project focused while providing a foundation for future enhancements.
+
+---
+
+## 🔮 Future Improvements
 
 Potential future improvements include:
 
-- Email/SMS notification providers
+- Email/SMS notification provider integration
 - Scheduled notifications
 - Dead-letter queues
-- Advanced monitoring
-- Distributed job processing
+- Exponential backoff for retries
+- Advanced monitoring and dashboards
+- Prometheus/Grafana integration
 - Rate limiting
 - Notification templates
-- Advanced metrics and dashboards
+- Distributed worker processing
+- Message prioritization
+- Advanced job filtering and search
 
 ---
 
 ## 📌 Project Status
 
-**Current Status:** `In Development`
+**Current Status:** `Finalization in Progress`
 
-The project is being developed incrementally with a focus on secure backend architecture, asynchronous processing, reliability, and production-oriented backend practices.
+The core functionality of the project has been implemented and validated through automated and integration testing.
+
+The remaining work focuses on:
+
+- Deployment configuration
+- Requirements/evidence documentation
+- Final QA
+- GitHub verification
+- Final submission
 
 ---
 

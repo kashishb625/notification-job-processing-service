@@ -25,9 +25,11 @@ The project demonstrates practical backend engineering concepts including:
 - Structured HTTP error responses
 - Audit logging
 - Processing metrics
+- Stakeholder metrics and operational monitoring
 - Automated unit testing
 - Integration testing
 - Database persistence
+- Docker containerization
 
 ---
 
@@ -104,6 +106,7 @@ This architecture demonstrates a basic asynchronous job-processing workflow suit
                            |                    |
                            v                    v
                          RETRY                FAILED
+
 ---
 
 ## ✨ Core Features
@@ -178,7 +181,7 @@ The worker:
 
 1. Receives the queued job.
 2. Retrieves the corresponding job from the database.
-3. Updates the job status to `PROCESSING...`.
+3. Updates the job status to `PROCESSING`.
 4. Processes the notification.
 5. Updates the final status.
 6. Records the corresponding audit event.
@@ -217,7 +220,7 @@ Jobs maintain their processing state throughout their lifecycle.
 Implemented statuses include:
 
 - `PENDING`
-- `PROCESSING...`
+- `PROCESSING`
 - `COMPLETED`
 - `RETRYING`
 - `FAILED`
@@ -291,7 +294,35 @@ Example response:
       "retryingJobs": 1
     }
 
-The remaining jobs may have other statuses such as `PENDING` or `PROCESSING...`.
+The remaining jobs may have other statuses such as `PENDING` or `PROCESSING`.
+
+### 11. Stakeholder Metrics and Business Value
+
+The primary stakeholders for this service are operations teams, backend developers, project managers, and administrators responsible for monitoring job-processing activity.
+
+The processing metrics help stakeholders understand the workload, identify failures, and decide when investigation or corrective action may be needed.
+
+| Metric | What It Indicates | Stakeholder Decision |
+|---|---|---|
+| Total Jobs | Overall volume of jobs submitted | Understand the workload handled by the service |
+| Completed Jobs | Number of successfully processed jobs | Assess successful processing activity |
+| Failed Jobs | Number of jobs that reached the failure state | Identify processing failures requiring investigation |
+| Retrying Jobs | Number of jobs undergoing retry handling | Investigate recurring failures or processing instability |
+| Job Status | Current state of an individual job | Track a job's progress |
+| Audit Events | Important application and job lifecycle events | Investigate errors and trace application activity |
+
+#### Measurable Outcomes
+
+The existing metrics provide measurable indicators of system activity:
+
+- **Job volume:** Measured by the total number of jobs.
+- **Successful processing:** Measured by the completed-job count.
+- **Failure activity:** Measured by the failed-job count.
+- **Retry activity:** Measured by the retrying-job count.
+
+These indicators can help stakeholders monitor operational behavior and identify areas requiring improvement.
+
+The current implementation provides basic processing metrics and audit logging. It does not include a dedicated stakeholder dashboard, historical trend analysis, or automated business reports.
 
 ---
 
@@ -312,7 +343,7 @@ The remaining jobs may have other statuses such as `PENDING` or `PROCESSING...`.
 | Postman | API and integration testing |
 | JUnit | Automated testing |
 | Mockito | Unit testing and mocking |
-| Docker | Containerized infrastructure |
+| Docker | Containerization and deployment |
 
 ---
 
@@ -425,7 +456,7 @@ The automated test suite covers:
 - Retry behavior
 - Maximum retry/failure handling
 
-Current automated test result:
+Previously recorded automated test result:
 
     Tests Run: 8
     Failures: 0
@@ -506,6 +537,7 @@ Testing evidence is maintained in:
     │   ├── Automated Tests/
     │   └── Integration Tests/
     │
+    ├── Dockerfile
     ├── pom.xml
     ├── README.md
     └── .gitignore
@@ -564,6 +596,7 @@ Testing evidence is maintained in:
 - [x] Processing metrics
 - [x] Audit logging
 - [x] Processing logs
+- [x] Stakeholder metrics and operational value documented
 
 ### Testing
 
@@ -579,11 +612,12 @@ Testing evidence is maintained in:
 
 ### Finalization
 
-- [ ] Docker deployment setup
-- [ ] Requirements and evidence documentation
-- [ ] Final QA
-- [ ] Final GitHub verification
-- [ ] Final project submission
+- [x] Docker image built and container startup verified
+- [x] Requirements and evidence documentation prepared
+- [x] Final QA
+- [x] Final GitHub verification
+- [x] Project documentation and README finalized
+- [x] Final project submission preparation
 
 ---
 
@@ -604,11 +638,12 @@ The implementation addresses the major project requirements:
 | Database persistence | MySQL + JPA/Hibernate |
 | Job tracking | NotificationJob status |
 | Metrics | `/api/metrics/jobs` |
+| Stakeholder metrics | Job volume, completion, failure, and retry indicators |
 | Audit logging | AuditLog entity/service |
 | Automated tests | JUnit + Mockito |
 | Integration validation | Postman |
 | Version control | Git + GitHub |
-| Infrastructure | Docker/RabbitMQ container |
+| Infrastructure | Dockerfile and Docker container |
 
 ---
 
@@ -639,7 +674,11 @@ RabbitMQ Management UI:
 
 Run the Spring Boot application from Eclipse or using Maven:
 
-    mvn spring-boot:run
+    mvnw.cmd spring-boot:run
+
+On macOS/Linux, use:
+
+    ./mvnw spring-boot:run
 
 The application will start on the configured server port.
 
@@ -659,6 +698,31 @@ Authentication flow:
           ↓
     Access Protected APIs
 
+### Docker Deployment
+
+The project includes a `Dockerfile` for packaging the Spring Boot application into a Docker image.
+
+Build the application JAR first, then build the Docker image:
+
+    docker build -t notification-job-service:latest .
+
+Run the container with the required database, RabbitMQ, and JWT environment variables configured for your environment.
+
+Example for a local Windows Docker setup:
+
+    docker run -d --name notification-job-service -p 8080:8080 ^
+      -e SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/notification_job_service ^
+      -e SPRING_DATASOURCE_USERNAME=<your-database-username> ^
+      -e SPRING_DATASOURCE_PASSWORD=<your-database-password> ^
+      -e SPRING_RABBITMQ_HOST=host.docker.internal ^
+      -e SPRING_RABBITMQ_PORT=5672 ^
+      -e SPRING_RABBITMQ_USERNAME=guest ^
+      -e SPRING_RABBITMQ_PASSWORD=guest ^
+      -e JWT-SECRET=<your-jwt-secret> ^
+      notification-job-service:latest
+
+Replace the placeholders with your local configuration. Do not commit real credentials or JWT secrets to GitHub.
+
 ---
 
 ## ⚠️ Scope and Limitations
@@ -672,7 +736,8 @@ Current limitations include:
 - Metrics are basic database-backed counters rather than a full monitoring platform.
 - Retry processing uses a fixed maximum retry limit.
 - The application does not currently implement a dedicated dead-letter queue.
-- Docker deployment configuration is part of the final project deployment setup.
+- Stakeholder metrics provide basic operational indicators rather than a dedicated business analytics dashboard.
+- Docker deployment uses the local development environment's MySQL and RabbitMQ configuration.
 
 These limitations keep the project focused while providing a foundation for future enhancements.
 
@@ -693,22 +758,17 @@ Potential future improvements include:
 - Distributed worker processing
 - Message prioritization
 - Advanced job filtering and search
+- Historical stakeholder metrics and trend analysis
 
 ---
 
 ## 📌 Project Status
 
-**Current Status:** `Finalization in Progress`
+**Current Status:** `Completed`
 
-The core functionality of the project has been implemented and validated through automated and integration testing.
+The core functionality of the project has been implemented and validated through automated and integration testing. Docker configuration, testing evidence, stakeholder metrics documentation, and the project README have also been prepared.
 
-The remaining work focuses on:
-
-- Deployment configuration
-- Requirements/evidence documentation
-- Final QA
-- GitHub verification
-- Final submission
+The project is ready for final submission, subject to the final verification of the GitHub repository and its contents.
 
 ---
 
@@ -716,4 +776,6 @@ The remaining work focuses on:
 
 **Kashish Bhatnagar**
 
-Java Backend Developer | Spring Boot | Spring Security | REST APIs | MySQL
+Java Backend Developer
+
+GitHub: https://github.com/kashishb625

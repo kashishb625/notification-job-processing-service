@@ -141,6 +141,9 @@ Implemented authorization behavior includes:
 - USER/ADMIN access control
 - Meaningful `403 Forbidden` responses
 - Stateless authentication using JWT
+- USER can access only their own notification jobs
+- ADMIN can access all notification jobs with creator details
+- Job ownership is enforced during individual job retrieval
 
 ### 3. Notification Job Management
 
@@ -162,6 +165,7 @@ Each job contains:
 - Message
 - Status
 - Retry count
+- Creator username (`createdBy`)
 
 ### 4. Message Queue
 
@@ -334,6 +338,7 @@ The current implementation provides basic processing metrics and audit logging. 
 | Spring Boot | Backend framework |
 | Spring Security | Authentication and authorization |
 | JWT | Stateless authentication |
+| Swagger / OpenAPI | API documentation and interactive endpoint testing |
 | BCrypt | Password hashing |
 | Spring Data JPA | Database persistence |
 | Hibernate | ORM |
@@ -382,6 +387,9 @@ Security features include:
 - Custom `401 Unauthorized` responses
 - Custom `403 Forbidden` responses
 - Sensitive configuration protection
+- Job ownership enforcement
+- Custom authentication entry point
+- USER/ADMIN job visibility restrictions
 
 Sensitive information such as:
 
@@ -419,6 +427,25 @@ should not be committed to the repository.
 
 ---
 
+## 📖 API Documentation — Swagger
+
+The API is documented using Swagger UI and OpenAPI.
+
+- Interactive API endpoint documentation
+- Request and response schema inspection
+- JWT Bearer token authorization for protected endpoints
+- API testing through the Swagger UI
+
+Swagger UI:
+
+`http://localhost:8080/swagger-ui/index.html`
+
+OpenAPI specification:
+
+`http://localhost:8080/v3/api-docs`
+
+---
+
 ## 📋 Example Job Request
 
     {
@@ -434,6 +461,7 @@ should not be committed to the repository.
       "message": "Your notification message",
       "status": "COMPLETED",
       "retryCount": 0
+      "createdBy": "your_username"
     }
 
 ---
@@ -485,8 +513,11 @@ Integration testing covered:
 | Successful job retrieval | `200 OK` |
 | Invalid request data | `400 Bad Request` |
 | Invalid authentication token | `401 Unauthorized` |
+| Request without authentication | `401 Unauthorized` |
 | Unauthorized role | `403 Forbidden` |
 | Job not found | `404 Not Found` |
+| USER accesses another user's job | `404 Not Found` |
+| ADMIN accesses an existing job | `200 OK` |
 
 ### Testing Evidence
 

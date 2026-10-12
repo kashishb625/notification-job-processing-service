@@ -15,12 +15,15 @@ public class SecurityConfig
 	
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
 	private final CustomAccessDeniedHandler customAccessDeniedHandler;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
 	public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
-			CustomAccessDeniedHandler customAccessDeniedHandler)
+			CustomAccessDeniedHandler customAccessDeniedHandler
+			,CustomAuthenticationEntryPoint customAuthenticationEntryPoint)
 	{
 	    this.jwtAuthenticationFilter = jwtAuthenticationFilter;
 	    this.customAccessDeniedHandler=customAccessDeniedHandler;
+	    this.customAuthenticationEntryPoint=customAuthenticationEntryPoint;
 	}
 	
 	@Bean
@@ -42,8 +45,9 @@ public class SecurityConfig
 					).permitAll()
 				.requestMatchers("/api/users/**").hasRole("ADMIN")
 				.anyRequest().authenticated())
-		.exceptionHandling(exception ->
-	    exception.accessDeniedHandler(customAccessDeniedHandler))
+		.exceptionHandling(exception -> exception
+        .authenticationEntryPoint(customAuthenticationEntryPoint)
+        .accessDeniedHandler(customAccessDeniedHandler))
 		.sessionManagement(session ->
         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 		.addFilterBefore(

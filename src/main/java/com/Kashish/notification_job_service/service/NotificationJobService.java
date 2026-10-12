@@ -40,6 +40,7 @@ public class NotificationJobService
 		Authentication authentication= SecurityContextHolder.getContext().getAuthentication();
 		
 		String username=authentication.getName();
+		job.setCreatedBy(username);
 		
 		NotificationJob savedJob= notificationJobRepository.save(job);
 		
@@ -52,12 +53,43 @@ public class NotificationJobService
 
 	public NotificationJob getJobById(Long id)
 	{
-		return notificationJobRepository.findById(id).orElseThrow(()->new ResourceNotFoundException("Notification job not found with id: "+id));
+		 Authentication authentication =SecurityContextHolder.getContext().getAuthentication();
+
+		    String username = authentication.getName();
+
+		    boolean isAdmin = authentication.getAuthorities().stream()
+		            .anyMatch(authority ->
+		                    authority.getAuthority().equals("ROLE_ADMIN"));
+
+		if (isAdmin) 
+		{
+	        return notificationJobRepository.findById(id)
+	                .orElseThrow(() ->
+	                        new ResourceNotFoundException(
+	                                "Notification job not found with id: " + id));
+	    }
+
+	    return notificationJobRepository.findByIdAndCreatedBy(id, username)
+	            .orElseThrow(() ->
+	                    new ResourceNotFoundException(
+	                            "Notification job not found with id: " + id));
 	}
 	
 	public List<NotificationJob> getAllJobs()
 	{
-		return notificationJobRepository.findAll();
+		Authentication authentication=SecurityContextHolder.getContext().getAuthentication();
+		String username=authentication.getName();
+		
+		boolean isAdmin=authentication.getAuthorities().stream().
+				anyMatch(authority->authority.getAuthority().equals("ROLE_ADMIN"));
+		
+		if(isAdmin)
+		{
+			return notificationJobRepository.findAll();
+		}
+		
+		return notificationJobRepository.findByCreatedBy(username);
+		
 	}
 	
 }

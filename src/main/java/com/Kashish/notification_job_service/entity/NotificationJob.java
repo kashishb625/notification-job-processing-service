@@ -15,6 +15,8 @@ public class NotificationJob
 	private String message;
 	private String status;
 	private int retryCount;
+	private String createdBy;
+	
 	public Long getId() {
 		return id;
 	}
@@ -44,6 +46,12 @@ public class NotificationJob
 	}
 	public void setRetryCount(int retryCount) {
 		this.retryCount = retryCount;
+	}
+	public String getCreatedBy() {
+		return createdBy;
+	}
+	public void setCreatedBy(String createdBy) {
+		this.createdBy = createdBy;
 	}
 		
 
